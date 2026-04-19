@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animal Cell Explorer - 3D Interactive</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    margin: 0;
+    font-family: 'Poppins', Arial, sans-serif;
+    text-align: center;
+    color: white;
+    background: #0a0e27;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+#bgCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.page {
+    display: none;
+    padding: 30px 20px;
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    animation: fadeIn 0.6s ease;
+}
+
+.active { display: block; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+h1 { font-size: 52px; text-shadow: 0 0 40px rgba(0,198,255,0.4); margin-bottom: 10px; }
+h2 { font-size: 38px; margin-bottom: 15px; }
+h3 { font-size: 24px; margin-bottom: 12px; color: #00c6ff; }
+p { font-size: 20px; line-height: 1.6; }
+
+button {
+    padding: 16px 32px;
+    margin: 8px;
+    font-size: 18px;
+    border-radius: 14px;
+    border: none;
+    background: linear-gradient(135deg, #00c6ff, #0072ff);
+    color: white;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0,114,255,0.3);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0,198,255,0.5);
+}
+
+button:active { transform: translateY(0); }
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+input {
+    padding: 14px 20px;
+    font-size: 18px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-family: 'Poppins', sans-serif;
+    outline: none;
+    transition: all 0.3s ease;
+    width: 280px;
+}
+
+input:focus {
+    border-color: #00c6ff;
+    box-shadow: 0 0 15px rgba(0,198,255,0.3);
+}
+
+input::placeholder { color: rgba(255,255,255,0.5); }
+
+.box {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    padding: 30px;
+    margin: 20px auto;
+    width: 90%;
+    max-width: 900px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* 3D CELL */
+#cell3DContainer {
+    position: relative;
+    width: 100%;
+    height: 500px;
+    margin: 20px auto;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: #05081a;
+}
+
+#cell3D {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+}
+
+#cell3D:active { cursor: grabbing; }
+
+#cellInfoPanel {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(15px);
+    padding: 18px 28px;
+    border-radius: 16px;
+    border: 1px solid rgba(0,198,255,0.3);
+    max-width: 520px;
+    width: 92%;
+    font-size: 15px;
+    color: #e0e0e0;
+    line-height: 1.6;
+    z-index: 10;
+}
+
+#cellInfoPanel h4 {
+    color: #00c6ff;
+    font-size: 18px;
+    margin-bottom: 6px;
+}
+
+#cellInfoPanel p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+#cellControls {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+}
+
+#cellControls button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 18px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#labelOverlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.cell-label {
+    position: absolute;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid rgba(0,198,255,0.4);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+}
+
+.cell-label:hover {
+    background: rgba(0,198,255,0.3);
+    border-color: #00c6ff;
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.cell-label.active {
+    background: rgba(0,255,136,0.25);
+    border-color: #00ff88;
+    color: #00ff88;
+}
+
+/* MATCHING GAME */
+.matchItem {
+    display: inline-block;
+    padding: 15px 20px;
+    margin: 10px;
+    font-size: 17px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    user-select: none;
+}
+
+.matchItem:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-2px);
+}
+
+.matchItem.selected {
+    border-color: #ff9800;
+    background: rgba(255,152,0,0.3) !important;
+    box-shadow: 0 0 20px rgba(255,152,0,0.3);
+}
+
+.matchItem.matched {
+    border-color: #00ff88;
+    background: rgba(0,255,136,0.25) !important;
+    pointer-events: none;
+}
+
+.matchItem.wrong {
+    animation: shake 0.5s ease;
+    border-color: #ff4444;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-10px); }
+    40%, 80% { transform: translateX(10px); }
+}
+
+/* IDENTIFY GAME */
+.id-game-clue {
+    font-size: 22px;
+    font-weight: 600;
+    color: #00c6ff;
+    margin: 25px 20px;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.id-game-btn {
+    display: inline-block;
+    margin: 8px;
+    min-width: 200px;
+}
+
+.id-game-btn.correct {
+    background: linear-gradient(135deg, #00ff88, #00cc6a) !important;
+}
+
+.id-game-btn.wrong {
+    background: linear-gradient(135deg, #ff4444, #cc0000) !important;
+    animation: shake 0.5s ease;
+}
+
+/* CREDITS */
+#creditsContainer {
+    position: relative;
+    overflow: hidden;
+    height: 260px;
+    margin-top: 20px;
+    border-radius: 15px;
+    background: rgba(0,0,0,0.2);
+}
+
+#credits {
+    position: absolute;
+    top: 100%;
+    width: 100%;
+    font-size: 22px;
+    animation: none;
+}
+
+#credits.animating {
+    animation: scrollDown 10s linear forwards;
+}
+
+@keyframes scrollDown {
+    from { top: 100%; }
+    to { top: -100%; }
+}
+
+#credits h2 { font-size: 28px; margin: 15px 0; color: #00c6ff; }
+#credits p { font-size: 20px; margin: 8px 0; }
+
+/* RATING BOX */
+#ratingBox {
+    display: none;
+    margin-top: 40px;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    padding: 25px;
+    width: 380px;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 15px;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: fadeIn 0.5s ease;
+}
+
+.star {
+    font-size: 42px;
+    cursor: pointer;
+    color: #555;
+    padding: 5px;
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.star:hover { transform: scale(1.2); }
+
+.star.active {
+    color: gold;
+    text-shadow: 0 0 15px rgba(255,215,0,0.5);
+}
+
+/* Quiz */
+.quiz-container { max-width: 700px; margin: 0 auto; }
+.quiz-btn {
+    display: block;
+    width: 100%;
+    max-width: 500px;
+    margin: 10px auto;
+    text-align: left;
+    padding-left: 25px;
+}
+
+.progress-bar {
+    width: 100%;
+    max-width: 500px;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    margin: 20px auto;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+/* Legend */
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    background: rgba(255,255,255,0.08);
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.legend-item:hover { background: rgba(255,255,255,0.2); }
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.score-display {
+    font-size: 28px;
+    font-weight: 700;
+    color: #00c6ff;
+    margin: 20px 0;
+}
+
+#feelingResponse {
+    margin-top: 15px;
+    font-style: italic;
+    color: #00c6ff;
+}
+
+@media (max-width: 768px) {
+    h1 { font-size: 34px; }
+    h2 { font-size: 26px; }
+    #cell3DContainer { height: 350px; }
+    .box { width: 95%; padding: 20px; }
+    button { font-size: 16px; padding: 14px 24px; }
+    .id-game-btn { min-width: 140px; }
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="bgCanvas"></canvas>
+
+<!-- INTRO -->
+<div id="intro1" class="page active">
+    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;">
+        <h1>Animal Cell Explorer</h1>
+        <p style="margin-bottom:30px;opacity:0.8;">Discover the microscopic world inside every living cell</p>
+        <p>What is your name?</p>
+        <input id="nameInput" placeholder="Enter your name..." autocomplete="name">
+        <br>
+        <button onclick="nextIntro()">Next</button>
+    </div>
+</div>
+
+<div id="intro2" class="page">
+    <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:80vh;">
+        <p>How is your day?</p>
+        <input id="feelingInput" placeholder="Great, good, okay, bad...">
+        <p id="feelingResponse"></p>
+        <br>
+        <button onclick="start()">Start Exploring</button>
+    </div>
+</div>
+
+<!-- MENU -->
+<div id="menu" class="page">
+    <h2 id="welcome"></h2>
+    <p style="margin-bottom:25px;opacity:0.8;">Choose an activity below</p>
+    <button onclick="showPage('explore')">Explore 3D Cell</button>
+    <button onclick="showPage('activity')">Games</button>
+    <button onclick="showPage('quiz')">Quiz</button>
+    <button onclick="showPage('end')">Finish</button>
+</div>
+
+<!-- EXPLORE 3D -->
+<div id="explore" class="page">
+    <h2>3D Animal Cell</h2>
+    <p style="opacity:0.8;margin-bottom:15px;">Drag to rotate, scroll to zoom, click labels to learn!</p>
+    <button onclick="showPage('menu')">Back to Menu</button>
+    <button onclick="resetCamera()">Reset View</button>
+
+    <div class="box" style="padding:0;overflow:hidden;">
+        <div id="cell3DContainer">
+            <canvas id="cell3D"></canvas>
+            <div id="labelOverlay"></div>
+            <div id="cellControls">
+                <button onclick="zoomIn()" title="Zoom In">+</button>
+                <button onclick="zoomOut()" title="Zoom Out">-</button>
+                <button onclick="toggleAutoRotate()" title="Auto Rotate">&#x21bb;</button>
+            </div>
+            <div id="cellInfoPanel">
+                <h4>Click on an organelle label</h4>
+                <p>Hover over and click the floating labels on the 3D cell to discover what each part does!</p>
+            </div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <p style="margin:15px 0;font-size:14px;opacity:0.7;">
+            Tip: Drag to rotate the cell. Scroll to zoom. Click any label for details.
+        </p>
+    </div>
+</div>
+
+<!-- GAME MENU -->
+<div id="activity" class="page">
+    <h2>Games</h2>
+    <p style="margin-bottom:20px;opacity:0.8;">Test your knowledge with fun activities!</p>
+    <button onclick="showPage('menu')">Back to Menu</button>
+    <div class="box">
+        <h3 style="margin-bottom:20px;">Select a Game</h3>
+        <button onclick="showPage('game1')">Match Organelles</button>
+        <button onclick="showPage('game2')">Guess the Organelle</button>
+    </div>
+</div>
+
+<!-- GAME 1 - MATCHING -->
+<div id="game1" class="page">
+    <h2>Match Organelles</h2>
+    <p>Click an organelle name, then click its correct function to match!</p>
+    <button onclick="showPage('activity')">Back</button>
+    <button onclick="resetGame()">Reset</button>
+    <div class="box">
+        <h3 style="margin-bottom:10px;">Organelles</h3>
+        <div id="organelleList">
+            <div class="matchItem" data-type="organelle" data-value="nucleus" onclick="selectMatch(this,'nucleus')">Nucleus</div>
+            <div class="matchItem" data-type="organelle" data-value="mitochondria" onclick="selectMatch(this,'mitochondria')">Mitochondria</div>
+            <div class="matchItem" data-type="organelle" data-value="golgi" onclick="selectMatch(this,'golgi')">Golgi Apparatus</div>
+            <div class="matchItem" data-type="organelle" data-value="lysosome" onclick="selectMatch(this,'lysosome')">Lysosome</div>
+            <div class="matchItem" data-type="organelle" data-value="rer" onclick="selectMatch(this,'rer')">Rough ER</div>
+        </div>
+        <h3 style="margin:20px 0 10px;">Functions</h3>
+        <div id="functionList">
+            <div class="matchItem" data-type="function" data-value="control" onclick="checkMatch('control')">Controls the cell (DNA)</div>
+            <div class="matchItem" data-type="function" data-value="energy" onclick="checkMatch('energy')">Produces ATP energy</div>
+            <div class="matchItem" data-type="function" data-value="package" onclick="checkMatch('package')">Packages proteins</div>
+            <div class="matchItem" data-type="function" data-value="digest" onclick="checkMatch('digest')">Breaks down waste</div>
+            <div class="matchItem" data-type="function" data-value="protein" onclick="checkMatch('protein')">Makes proteins</div>
+        </div>
+        <p id="gameResult" style="margin-top:20px;font-size:18px;font-weight:600;"></p>
+        <p id="gameScore" style="font-size:16px;opacity:0.8;"></p>
+    </div>
+</div>
+
+<!-- GAME 2 - GUESS ORGANELLE (3 Questions) -->
+<div id="game2" class="page">
+    <h2>Guess the Organelle</h2>
+    <p id="idHeaderText">Read the clue and click the correct organelle! (3 questions)</p>
+    <button onclick="showPage('activity')">Back</button>
+    <button onclick="resetIdentifyGame()">Reset</button>
+    <div class="box">
+        <div class="progress-bar">
+            <div class="progress-fill" id="identifyProgress" style="width:0%"></div>
+        </div>
+        <p id="idQuestionNum" style="font-size:16px;opacity:0.7;margin-top:10px;">Question 1 of 3</p>
+        <div class="id-game-clue" id="idClue">Loading...</div>
+        <div id="idButtons">
+            <button class="id-game-btn" onclick="makeGuess(0)" id="idBtn0">-</button>
+            <button class="id-game-btn" onclick="makeGuess(1)" id="idBtn1">-</button>
+            <br>
+            <button class="id-game-btn" onclick="makeGuess(2)" id="idBtn2">-</button>
+            <button class="id-game-btn" onclick="makeGuess(3)" id="idBtn3">-</button>
+        </div>
+        <p id="idFeedback" style="margin-top:20px;font-size:18px;font-weight:600;min-height:28px;"></p>
+        <p id="idFinalScore" class="score-display"></p>
+    </div>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" class="page">
+    <h2>Cell Quiz</h2>
+    <p>Test your knowledge of animal cell organelles!</p>
+    <button onclick="showPage('menu')">Back to Menu</button>
+    <button onclick="resetQuiz()">Restart Quiz</button>
+    <div class="box quiz-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="quizProgress" style="width:0%"></div>
+        </div>
+        <p id="q" style="font-size:22px;font-weight:600;margin:20px 0;"></p>
+        <button class="quiz-btn" onclick="ans('a')" id="a"></button>
+        <button class="quiz-btn" onclick="ans('b')" id="b"></button>
+        <button class="quiz-btn" onclick="ans('c')" id="c"></button>
+        <p id="quizFeedback" style="margin-top:15px;font-weight:600;min-height:24px;"></p>
+        <p id="score" class="score-display"></p>
+    </div>
+</div>
+
+<!-- CREDITS -->
+<div id="end" class="page">
+    <h1 style="margin-bottom:20px;">Credits</h1>
+    <button onclick="showPage('menu')">Back to Menu</button>
+    <button onclick="restartCredits()">Replay Credits</button>
+    <div class="box" style="padding:0;overflow:hidden;">
+        <div id="creditsContainer">
+            <div id="credits">
+                <h2>Project Leader</h2>
+                <p>Fathalaleem</p>
+                <p style="font-size:16px;opacity:0.7;">Coding &amp; Design</p>
+                <h2>Research Team</h2>
+                <p>Saif Abdelrhman</p>
+                <p style="font-size:16px;opacity:0.7;">Cell Biology Research</p>
+                <h2>Design Team</h2>
+                <p>Sultan Alhammadi</p>
+                <p style="font-size:16px;opacity:0.7;">Visual Design</p>
+                <h2>Quality Assurance</h2>
+                <p>Muhtadi Ali</p>
+                <p style="font-size:16px;opacity:0.7;">Testing &amp; Feedback</p>
+                <h2>Built With</h2>
+                <p>Three.js - 3D Graphics</p>
+                <p>HTML5 Canvas</p>
+                <p>CSS3 Animations</p>
+            </div>
+        </div>
+    </div>
+    <div id="ratingBox">
+        <h3>Rate This Project</h3>
+        <p style="margin:10px 0;opacity:0.8;">Tap the stars to rate!</p>
+        <div id="stars">
+            <span class="star" data-value="1">&#9733;</span>
+            <span class="star" data-value="2">&#9733;</span>
+            <span class="star" data-value="3">&#9733;</span>
+            <span class="star" data-value="4">&#9733;</span>
+            <span class="star" data-value="5">&#9733;</span>
+        </div>
+        <p id="emoji" style="margin-top:15px;font-size:18px;font-weight:600;"></p>
+    </div>
+</div>
+
+<script>
+// ===================== BACKGROUND PARTICLES =====================
+(function() {
+    var canvas = document.getElementById('bgCanvas');
+    var ctx = canvas.getContext('2d');
+    var particles = [];
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+    for (var i = 0; i < 50; i++) {
+        particles.push({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            r: Math.random() * 2 + 0.5,
+            dx: (Math.random() - 0.5) * 0.3, dy: (Math.random() - 0.5) * 0.3,
+            alpha: Math.random() * 0.5 + 0.1
+        });
+    }
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            p.x += p.dx; p.y += p.dy;
+            if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
+            if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0,198,255,' + p.alpha + ')';
+            ctx.fill();
+        }
+        for (var a = 0; a < particles.length; a++) {
+            for (var b = a + 1; b < particles.length; b++) {
+                var ddx = particles[a].x - particles[b].x;
+                var ddy = particles[a].y - particles[b].y;
+                var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+                if (dist < 150) {
+                    ctx.beginPath();
+                    ctx.moveTo(particles[a].x, particles[a].y);
+                    ctx.lineTo(particles[b].x, particles[b].y);
+                    ctx.strokeStyle = 'rgba(0,198,255,' + (0.08 * (1 - dist / 150)) + ')';
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+})();
+
+// ===================== NAVIGATION =====================
+function showPage(id) {
+    document.querySelectorAll('.page').forEach(function(p) {
+        p.classList.remove('active'); p.style.animation = 'none';
+    });
+    var target = document.getElementById(id);
+    target.classList.add('active');
+    target.style.animation = ''; void target.offsetHeight;
+    target.style.animation = 'fadeIn 0.6s ease';
+    if (id === 'end') startCredits();
+    if (id === 'explore') setTimeout(function() { if (!scene) init3D(); }, 100);
+    if (id === 'game2') { if (!idGameLoaded) { idGameLoaded = true; resetIdentifyGame(); } }
+}
+
+function nextIntro() {
+    var name = document.getElementById('nameInput').value.trim();
+    if (!name) {
+        document.getElementById('nameInput').style.borderColor = '#ff4444';
+        setTimeout(function() { document.getElementById('nameInput').style.borderColor = ''; }, 2000);
+        return;
+    }
+    showPage('intro2');
+}
+
+function start() {
+    var name = document.getElementById('nameInput').value.trim() || 'Explorer';
+    var feeling = document.getElementById('feelingInput').value.trim().toLowerCase();
+    document.getElementById('welcome').innerText = 'Welcome, ' + name + '!';
+    var responses = {
+        good: 'Glad to hear you are having a good day! Let us learn something new!',
+        great: 'That is awesome! Ready to explore the microscopic world?',
+        fine: 'Good to know! Let us dive into cell biology!',
+        okay: 'Hope it gets even better! Let us explore together!',
+        bad: 'Sorry to hear that. Maybe learning something new will help!',
+        sad: 'We hope this interactive cell explorer cheers you up!'
+    };
+    var response = 'Let us explore the amazing world of cells together!';
+    for (var key in responses) { if (feeling.indexOf(key) !== -1) { response = responses[key]; break; } }
+    document.getElementById('feelingResponse').innerText = response;
+    showPage('menu');
+}
+
+// ===================== 3D CELL DATA =====================
+var ORGANELLE_DATA = {
+    nucleus: { name: 'Nucleus', color: '#8B5CF6',
+        desc: 'The control center of the cell. It stores DNA and coordinates all cellular activities like growth, metabolism, and reproduction. Surrounded by a nuclear envelope with pores.',
+        size: 1.2, pos: [0, 0, 0] },
+    mitochondria: { name: 'Mitochondria', color: '#F59E0B',
+        desc: 'Known as the "powerhouse" of the cell. They produce ATP energy through cellular respiration. They have their own DNA and folded inner membranes called cristae.',
+        size: 0.35, pos: [1.6, 0.6, 0.6] },
+    mitochondria2: { name: 'Mitochondria', color: '#F59E0B',
+        desc: 'Known as the "powerhouse" of the cell. They produce ATP energy through cellular respiration. They have their own DNA and folded inner membranes called cristae.',
+        size: 0.28, pos: [-1.3, -0.6, 0.9] },
+    golgi: { name: 'Golgi Apparatus', color: '#10B981',
+        desc: 'The Golgi apparatus modifies, sorts, and packages proteins and lipids for transport. It looks like a stack of flattened sacs (cisternae) and acts as the cell\'s post office.',
+        size: 0.55, pos: [0.7, 1.1, -0.5] },
+    lysosome: { name: 'Lysosome', color: '#EF4444',
+        desc: 'Lysosomes contain digestive enzymes that break down waste materials, cellular debris, and foreign invaders like bacteria. They act as the cell\'s recycling center.',
+        size: 0.18, pos: [-0.9, 0.9, 0.7] },
+    lysosome2: { name: 'Lysosome', color: '#EF4444',
+        desc: 'Lysosomes contain digestive enzymes that break down waste materials and cellular debris. They act as the cell\'s recycling center.',
+        size: 0.14, pos: [1.1, -0.7, -0.3] },
+    rer: { name: 'Rough ER', color: '#3B82F6',
+        desc: 'The Rough Endoplasmic Reticulum is covered with ribosomes, giving it a "rough" look. It synthesizes and transports proteins throughout the cell.',
+        size: 0.45, pos: [-1.0, 0.1, -0.7] },
+    ser: { name: 'Smooth ER', color: '#06B6D4',
+        desc: 'The Smooth Endoplasmic Reticulum lacks ribosomes, giving it a smooth look. It makes lipids, metabolizes carbs, and detoxifies drugs and poisons.',
+        size: 0.4, pos: [0.4, -0.9, 0.5] },
+    centrioles: { name: 'Centrioles', color: '#EC4899',
+        desc: 'Centrioles are cylinder-shaped structures made of microtubules. They organize spindle fibers during cell division (mitosis) to separate chromosomes.',
+        size: 0.22, pos: [0.3, -0.3, 1.2] }
+};
+
+// Add extra entries for clicking
+ORGANELLE_DATA.membrane = { name: 'Cell Membrane', color: '#88ccff',
+    desc: 'The cell membrane is a phospholipid bilayer that surrounds and protects the cell. It controls what enters and leaves, maintains homeostasis, and has receptor proteins for cell communication.' };
+ORGANELLE_DATA.cytoplasm = { name: 'Cytoplasm', color: '#44aaff',
+    desc: 'The cytoplasm is the jelly-like fluid (cytosol) filling the cell. It suspends all organelles and is where many chemical reactions occur.' };
+
+// ===================== 3D RENDERER =====================
+var scene, camera, renderer, cellGroup;
+var autoRotate = true, isDragging = false;
+var prevMouse = { x: 0, y: 0 };
+var camDist = 6, camTheta = 0, camPhi = 1.3;
+var labelElements = [];
+var threeReady = false;
+
+function hexColor(hexStr) {
+    return parseInt(hexStr.replace('#', ''), 16);
+}
+
+function updateCamera() {
+    if (!camera) return;
+    var x = camDist * Math.sin(camPhi) * Math.cos(camTheta);
+    var y = camDist * Math.cos(camPhi);
+    var z = camDist * Math.sin(camPhi) * Math.sin(camTheta);
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 0, 0);
+}
+
+function init3D() {
+    try {
+        var container = document.getElementById('cell3DContainer');
+        var canvas = document.getElementById('cell3D');
+
+        // Check Three.js loaded
+        if (typeof THREE === 'undefined') {
+            document.getElementById('cellInfoPanel').innerHTML = '<h4>Loading 3D Library...</h4><p>Please check your internet connection and refresh.</p>';
+            return;
+        }
+
+        scene = new THREE.Scene();
+
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+        updateCamera();
+
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Mouse controls
+        canvas.addEventListener('mousedown', function(e) { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+        canvas.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            var dx = e.clientX - prevMouse.x, dy = e.clientY - prevMouse.y;
+            camTheta -= dx * 0.008; camPhi += dy * 0.008;
+            camPhi = Math.max(0.2, Math.min(Math.PI - 0.2, camPhi));
+            prevMouse = { x: e.clientX, y: e.clientY }; updateCamera();
+        });
+        canvas.addEventListener('mouseup', function() { isDragging = false; });
+        canvas.addEventListener('mouseleave', function() { isDragging = false; });
+        canvas.addEventListener('wheel', function(e) { e.preventDefault(); camDist += e.deltaY * 0.005; camDist = Math.max(3.5, Math.min(10, camDist)); updateCamera(); }, { passive: false });
+
+        // Touch
+        var touchStart = { x: 0, y: 0 };
+        canvas.addEventListener('touchstart', function(e) { e.preventDefault(); if (e.touches.length === 1) { isDragging = true; touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }; prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; } }, { passive: false });
+        canvas.addEventListener('touchmove', function(e) { e.preventDefault(); if (e.touches.length === 1 && isDragging) { var dx = e.touches[0].clientX - prevMouse.x, dy = e.touches[0].clientY - prevMouse.y; camTheta -= dx * 0.008; camPhi += dy * 0.008; camPhi = Math.max(0.2, Math.min(Math.PI - 0.2, camPhi)); prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; updateCamera(); } }, { passive: false });
+        canvas.addEventListener('touchend', function() { isDragging = false; });
+
+        // Lights
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        var dl1 = new THREE.DirectionalLight(0xffffff, 0.8); dl1.position.set(5, 5, 5); scene.add(dl1);
+        var dl2 = new THREE.DirectionalLight(0x4488ff, 0.4); dl2.position.set(-5, -3, 2); scene.add(dl2);
+        var pl = new THREE.PointLight(0x00c6ff, 0.5, 12); pl.position.set(2, 2, 4); scene.add(pl);
+
+        cellGroup = new THREE.Group();
+        scene.add(cellGroup);
+
+        // --- CELL MEMBRANE ---
+        var mGeo = new THREE.SphereGeometry(2.5, 48, 48);
+        var mMat = new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.15, roughness: 0.1, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1, side: THREE.DoubleSide });
+        var membrane = new THREE.Mesh(mGeo, mMat);
+        membrane.userData = { key: 'membrane' };
+        cellGroup.add(membrane);
+
+        // --- NUCLEUS ---
+        var nd = ORGANELLE_DATA.nucleus;
+        var nGeo = new THREE.SphereGeometry(nd.size, 32, 32);
+        var nMat = new THREE.MeshPhysicalMaterial({ color: hexColor(nd.color), roughness: 0.3, metalness: 0.1, clearcoat: 0.5 });
+        var nucleus = new THREE.Mesh(nGeo, nMat);
+        nucleus.position.set(nd.pos[0], nd.pos[1], nd.pos[2]);
+        nucleus.userData = { key: 'nucleus' };
+        cellGroup.add(nucleus);
+
+        // Nucleolus
+        var nlGeo = new THREE.SphereGeometry(0.4, 16, 16);
+        var nlMat = new THREE.MeshPhysicalMaterial({ color: 0x6D28D9, roughness: 0.4 });
+        var nucleolus = new THREE.Mesh(nlGeo, nlMat);
+        nucleolus.position.set(0.25, 0.1, 0.25);
+        nucleus.add(nucleolus);
+
+        // --- MITOCHONDRIA (using spheres + torus for cristae) ---
+        function makeMitochondria(key, data) {
+            var g = new THREE.Group();
+            // Main body: elongated sphere
+            var bodyGeo = new THREE.SphereGeometry(data.size, 16, 12);
+            var bodyMat = new THREE.MeshPhysicalMaterial({ color: hexColor(data.color), roughness: 0.4, metalness: 0.1 });
+            var body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.scale.set(1.6, 0.7, 0.7);
+            g.add(body);
+            // Cristae (inner folds) - small torus rings
+            for (var i = 0; i < 3; i++) {
+                var tGeo = new THREE.TorusGeometry(data.size * 0.35, data.size * 0.06, 8, 16);
+                var tMat = new THREE.MeshPhysicalMaterial({ color: 0xD97706 });
+                var t = new THREE.Mesh(tGeo, tMat);
+                t.rotation.y = Math.PI / 2;
+                t.position.x = (i - 1) * data.size * 0.35;
+                t.scale.set(1, 0.6, 1);
+                g.add(t);
+            }
+            g.position.set(data.pos[0], data.pos[1], data.pos[2]);
+            g.userData = { key: key };
+            cellGroup.add(g);
+        }
+        makeMitochondria('mitochondria', ORGANELLE_DATA.mitochondria);
+        makeMitochondria('mitochondria2', ORGANELLE_DATA.mitochondria2);
+
+        // --- GOLGI APPARATUS (stacked curved boxes) ---
+        var gd = ORGANELLE_DATA.golgi;
+        var golgiG = new THREE.Group();
+        for (var gi = 0; gi < 4; gi++) {
+            var w = gd.size * (1.8 - gi * 0.08);
+            var h = gd.size * 0.15;
+            var d = gd.size * 0.7;
+            var boxGeo = new THREE.BoxGeometry(w, h, d);
+            // Curve by modifying vertices
+            var positions = boxGeo.attributes.position;
+            for (var vi = 0; vi < positions.count; vi++) {
+                var px = positions.getX(vi);
+                var py = positions.getY(vi);
+                positions.setZ(vi, positions.getZ(vi) - Math.sin(px * 2) * 0.12);
+            }
+            positions.needsUpdate = true;
+            boxGeo.computeVertexNormals();
+            var boxMat = new THREE.MeshPhysicalMaterial({ color: hexColor(gd.color), roughness: 0.3, side: THREE.DoubleSide });
+            var layer = new THREE.Mesh(boxGeo, boxMat);
+            layer.position.y = (gi - 1.5) * gd.size * 0.22;
+            golgiG.add(layer);
+        }
+        golgiG.position.set(gd.pos[0], gd.pos[1], gd.pos[2]);
+        golgiG.userData = { key: 'golgi' };
+        cellGroup.add(golgiG);
+
+        // --- LYSOSOMES ---
+        function makeLysosome(key, data) {
+            var lGeo = new THREE.SphereGeometry(data.size, 16, 16);
+            var lMat = new THREE.MeshPhysicalMaterial({ color: hexColor(data.color), roughness: 0.3, metalness: 0.2, clearcoat: 0.3 });
+            var lMesh = new THREE.Mesh(lGeo, lMat);
+            lMesh.position.set(data.pos[0], data.pos[1], data.pos[2]);
+            lMesh.userData = { key: key };
+            cellGroup.add(lMesh);
+        }
+        makeLysosome('lysosome', ORGANELLE_DATA.lysosome);
+        makeLysosome('lysosome2', ORGANELLE_DATA.lysosome2);
+
+        // --- ROUGH ER (wavy tube) ---
+        var rd = ORGANELLE_DATA.rer;
+        var rPoints = [
+            new THREE.Vector3(-1.4, 0.7, -0.5), new THREE.Vector3(-0.7, 0.4, -0.8),
+            new THREE.Vector3(-0.5, 0.0, -0.95), new THREE.Vector3(-0.7, -0.4, -0.6),
+            new THREE.Vector3(-1.2, -0.25, -0.3)
+        ];
+        var rCurve = new THREE.CatmullRomCurve3(rPoints);
+        var rGeo = new THREE.TubeGeometry(rCurve, 24, rd.size * 0.3, 10, false);
+        var rMat = new THREE.MeshPhysicalMaterial({ color: hexColor(rd.color), roughness: 0.4 });
+        var rer = new THREE.Mesh(rGeo, rMat);
+        rer.userData = { key: 'rer' };
+        cellGroup.add(rer);
+
+        // Ribosomes on Rough ER
+        for (var ri = 0; ri < 12; ri++) {
+            var rt = (ri + 2) / 16;
+            var rpt = rCurve.getPointAt(Math.min(rt, 0.95));
+            var ribGeo = new THREE.SphereGeometry(0.07, 6, 6);
+            var ribMat = new THREE.MeshPhysicalMaterial({ color: 0x1D4ED8 });
+            var rib = new THREE.Mesh(ribGeo, ribMat);
+            rib.position.set(
+                rpt.x + (Math.random() - 0.5) * 0.2,
+                rpt.y + Math.random() * 0.15 + 0.1,
+                rpt.z + (Math.random() - 0.5) * 0.2
+            );
+            cellGroup.add(rib);
+        }
+
+        // --- SMOOTH ER (wavy tube, thinner) ---
+        var sd = ORGANELLE_DATA.ser;
+        var sPoints = [
+            new THREE.Vector3(0.7, -0.4, 0.7), new THREE.Vector3(0.2, -1.1, 0.5),
+            new THREE.Vector3(-0.3, -0.9, 0.8), new THREE.Vector3(-0.45, -0.5, 0.5),
+            new THREE.Vector3(0.0, -0.7, 0.85)
+        ];
+        var sCurve = new THREE.CatmullRomCurve3(sPoints);
+        var sGeo = new THREE.TubeGeometry(sCurve, 24, sd.size * 0.25, 10, false);
+        var sMat = new THREE.MeshPhysicalMaterial({ color: hexColor(sd.color), roughness: 0.4 });
+        var ser = new THREE.Mesh(sGeo, sMat);
+        ser.userData = { key: 'ser' };
+        cellGroup.add(ser);
+
+        // --- CENTRIOLES ---
+        var cd = ORGANELLE_DATA.centrioles;
+        var centG = new THREE.Group();
+        for (var ci = 0; ci < 2; ci++) {
+            var cGeo = new THREE.CylinderGeometry(cd.size * 0.3, cd.size * 0.3, cd.size * 2.0, 10);
+            var cMat = new THREE.MeshPhysicalMaterial({ color: hexColor(cd.color), roughness: 0.4 });
+            var cent = new THREE.Mesh(cGeo, cMat);
+            cent.rotation.z = Math.PI / 2;
+            cent.position.x = (ci - 0.5) * 0.25;
+            cent.rotation.y = ci * Math.PI / 3;
+            centG.add(cent);
+        }
+        centG.position.set(cd.pos[0], cd.pos[1], cd.pos[2]);
+        centG.userData = { key: 'centrioles' };
+        cellGroup.add(centG);
+
+        // Raycaster click
+        var raycaster = new THREE.Raycaster();
+        var mouseVec = new THREE.Vector2();
+        canvas.addEventListener('click', function(event) {
+            var rect = container.getBoundingClientRect();
+            mouseVec.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouseVec.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouseVec, camera);
+            var intersects = raycaster.intersectObjects(cellGroup.children, true);
+            if (intersects.length > 0) {
+                var obj = intersects[0].object;
+                while (obj.parent && obj.parent !== cellGroup && !obj.userData.key) obj = obj.parent;
+                if (obj.userData.key) showOrganelleInfo(obj.userData.key);
+            }
+        });
+
+        threeReady = true;
+        createLabels();
+        createLegend();
+        animate3D();
+        window.addEventListener('resize', on3DResize);
+
+    } catch (err) {
+        console.error('3D Init Error:', err);
+        document.getElementById('cellInfoPanel').innerHTML = '<h4>3D Error</h4><p>' + err.message + '</p>';
+    }
+}
+
+function createLabels() {
+    var overlay = document.getElementById('labelOverlay');
+    overlay.innerHTML = '';
+    labelElements = [];
+    var labelData = [
+        { key: 'nucleus', text: 'Nucleus', offset: [0, 1.55, 0] },
+        { key: 'mitochondria', text: 'Mitochondria', offset: [2.0, 1.0, 0.7] },
+        { key: 'mitochondria2', text: 'Mitochondria', offset: [-1.7, -0.4, 1.1] },
+        { key: 'golgi', text: 'Golgi', offset: [1.2, 1.6, -0.3] },
+        { key: 'lysosome', text: 'Lysosome', offset: [-1.2, 1.2, 0.85] },
+        { key: 'rer', text: 'Rough ER', offset: [-1.3, 0.5, -1.0] },
+        { key: 'ser', text: 'Smooth ER', offset: [0.5, -1.3, 0.8] },
+        { key: 'centrioles', text: 'Centrioles', offset: [0.5, -0.15, 1.6] },
+        { key: 'membrane', text: 'Cell Membrane', offset: [2.7, 1.5, 1.0] }
+    ];
+    labelData.forEach(function(ld) {
+        var el = document.createElement('div');
+        el.className = 'cell-label';
+        el.textContent = ld.text;
+        el.dataset.key = ld.key;
+        el.addEventListener('click', function() { showOrganelleInfo(ld.key); });
+        overlay.appendChild(el);
+        labelElements.push({
+            element: el,
+            position: new THREE.Vector3(ld.offset[0], ld.offset[1], ld.offset[2]),
+            key: ld.key
+        });
+    });
+}
+
+function createLegend() {
+    var legend = document.getElementById('legend');
+    legend.innerHTML = '';
+    var seen = {};
+    Object.keys(ORGANELLE_DATA).forEach(function(key) {
+        var data = ORGANELLE_DATA[key];
+        if (seen[data.name]) return;
+        seen[data.name] = true;
+        var item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = '<span class="legend-dot" style="background:' + data.color + '"></span>' + data.name;
+        item.addEventListener('click', function() { showOrganelleInfo(key); });
+        legend.appendChild(item);
+    });
+}
+
+function updateLabels() {
+    if (!camera || !cellGroup) return;
+    var container = document.getElementById('cell3DContainer');
+    var rect = container.getBoundingClientRect();
+    labelElements.forEach(function(le) {
+        var pos = le.position.clone();
+        pos.applyMatrix4(cellGroup.matrixWorld);
+        pos.project(camera);
+        var x = (pos.x * 0.5 + 0.5) * rect.width;
+        var y = (-pos.y * 0.5 + 0.5) * rect.height;
+        le.element.style.left = x + 'px';
+        le.element.style.top = y + 'px';
+        le.element.style.opacity = pos.z > 1 ? '0.15' : '1';
+    });
+}
+
+function showOrganelleInfo(key) {
+    var data = ORGANELLE_DATA[key];
+    if (!data) return;
+    var panel = document.getElementById('cellInfoPanel');
+    panel.innerHTML = '<h4>' + data.name + '</h4><p>' + data.desc + '</p>';
+    document.querySelectorAll('.cell-label').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.key === key);
+    });
+    setTimeout(function() {
+        document.querySelectorAll('.cell-label').forEach(function(el) { el.classList.remove('active'); });
+    }, 3000);
+}
+
+function animate3D() {
+    requestAnimationFrame(animate3D);
+    if (autoRotate && cellGroup && !isDragging) cellGroup.rotation.y += 0.003;
+    updateLabels();
+    if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+function on3DResize() {
+    var container = document.getElementById('cell3DContainer');
+    if (!container || !camera || !renderer) return;
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+}
+
+function resetCamera() { camDist = 6; camTheta = 0; camPhi = 1.3; updateCamera(); }
+function zoomIn() { camDist = Math.max(3.5, camDist - 0.5); updateCamera(); }
+function zoomOut() { camDist = Math.min(10, camDist + 0.5); updateCamera(); }
+function toggleAutoRotate() { autoRotate = !autoRotate; }
+
+// ===================== GAME 1 - MATCHING =====================
+var selectedMatch = null, selectedElement = null, matchScore = 0;
+var totalMatches = 5;
+var matchedPairs = {};
+
+var MATCH_ANSWERS = {
+    nucleus: 'control', mitochondria: 'energy', golgi: 'package',
+    lysosome: 'digest', rer: 'protein'
+};
+
+function selectMatch(el, val) {
+    if (matchedPairs[val]) return;
+    document.querySelectorAll('#organelleList .matchItem').forEach(function(i) {
+        if (!matchedPairs[i.dataset.value]) i.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    selectedMatch = val;
+    selectedElement = el;
+}
+
+function checkMatch(val) {
+    var resultEl = document.getElementById('gameResult');
+    var scoreEl = document.getElementById('gameScore');
+    if (!selectedMatch) {
+        resultEl.innerText = 'Please select an organelle first!';
+        resultEl.style.color = '#ff9800';
+        return;
+    }
+    var clickedEl = event.target;
+    var correct = MATCH_ANSWERS[selectedMatch] === val;
+    if (correct) {
+        resultEl.innerText = 'Correct match!';
+        resultEl.style.color = '#00ff88';
+        selectedElement.classList.add('matched');
+        clickedEl.classList.add('matched');
+        matchedPairs[selectedMatch] = true;
+        matchScore++;
+        if (matchScore >= totalMatches) {
+            resultEl.innerText = 'All matched! Great job!';
+            scoreEl.innerText = 'Final Score: ' + matchScore + '/' + totalMatches + ' - Perfect!';
+            scoreEl.style.color = '#00ff88';
+        } else {
+            scoreEl.innerText = 'Matched: ' + matchScore + '/' + totalMatches;
+        }
+    } else {
+        resultEl.innerText = 'Not quite right. Try again!';
+        resultEl.style.color = '#ff4444';
+        clickedEl.classList.add('wrong');
+        setTimeout(function() { clickedEl.classList.remove('wrong'); }, 500);
+    }
+    selectedMatch = null;
+    selectedElement = null;
+}
+
+function resetGame() {
+    selectedMatch = null; selectedElement = null; matchScore = 0; matchedPairs = {};
+    document.getElementById('gameResult').innerText = '';
+    document.getElementById('gameScore').innerText = '';
+    document.querySelectorAll('#game1 .matchItem').forEach(function(i) {
+        i.classList.remove('selected', 'matched', 'wrong');
+    });
+}
+
+// ===================== GAME 2 - GUESS ORGANELLE (3 Questions) =====================
+var idGameLoaded = false;
+var idScore = 0, idTotal = 0, idAnswering = false;
+var idCurrentQ = null, idQIndex = 0, idGameQuestions = [];
+
+var ID_QUESTIONS = [
+    { clue: 'I am the control center of the cell. I store DNA and direct all cellular activities.', answer: 'Nucleus', opts: ['Nucleus', 'Mitochondria', 'Golgi Apparatus', 'Lysosome'] },
+    { clue: 'I am called the "powerhouse" of the cell. I produce ATP energy through cellular respiration.', answer: 'Mitochondria', opts: ['Nucleus', 'Mitochondria', 'Smooth ER', 'Centrioles'] },
+    { clue: 'I modify, sort, and package proteins into vesicles for transport. I look like a stack of pancakes.', answer: 'Golgi Apparatus', opts: ['Rough ER', 'Golgi Apparatus', 'Lysosome', 'Nucleus'] },
+    { clue: 'I contain powerful digestive enzymes that break down waste and foreign invaders.', answer: 'Lysosome', opts: ['Mitochondria', 'Golgi Apparatus', 'Lysosome', 'Smooth ER'] },
+    { clue: 'I am covered with tiny ribosomes, giving me a "rough" look. I help make proteins.', answer: 'Rough ER', opts: ['Smooth ER', 'Rough ER', 'Cytoplasm', 'Cell Membrane'] },
+    { clue: 'I lack ribosomes so I look smooth. I make lipids and detoxify harmful substances.', answer: 'Smooth ER', opts: ['Rough ER', 'Golgi Apparatus', 'Smooth ER', 'Nucleolus'] },
+    { clue: 'I am the jelly-like fluid that fills the cell and holds organelles in place.', answer: 'Cytoplasm', opts: ['Nucleoplasm', 'Cytoplasm', 'Cytoskeleton', 'Protoplasm'] },
+    { clue: 'I am the protective barrier that controls what enters and leaves the cell.', answer: 'Cell Membrane', opts: ['Cell Wall', 'Cell Membrane', 'Nuclear Envelope', 'Chloroplast'] },
+    { clue: 'I am the dark spot inside the nucleus where ribosomes are assembled.', answer: 'Nucleolus', opts: ['Chromosome', 'Nucleolus', 'Centriole', 'Ribosome'] },
+    { clue: 'I am made of microtubules and help pull chromosomes apart during cell division.', answer: 'Centrioles', opts: ['Spindle Fibers', 'Centrioles', 'Microfilaments', 'Lysosomes'] },
+    { clue: 'I have my own DNA and a double membrane with folded inner layers called cristae.', answer: 'Mitochondria', opts: ['Nucleus', 'Golgi Apparatus', 'Mitochondria', 'Ribosome'] },
+    { clue: 'I am the cell\'s "post office" - I receive proteins, process them, and ship them out.', answer: 'Golgi Apparatus', opts: ['Rough ER', 'Golgi Apparatus', 'Smooth ER', 'Vesicle'] }
+];
+
+function shuffleArr(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+}
+
+function pickThreeQuestions() {
+    var shuffled = shuffleArr(ID_QUESTIONS);
+    return shuffled.slice(0, 3);
+}
+
+function loadIdentifyQuestion() {
+    if (idAnswering) return;
+    idAnswering = false;
+
+    // Check if game is done (3 questions answered)
+    if (idQIndex >= 3) {
+        document.getElementById('idQuestionNum').innerText = 'Game Complete!';
+        document.getElementById('idClue').innerText = 'Great job! You finished all 3 questions.';
+        document.getElementById('idButtons').style.display = 'none';
+        document.getElementById('idFeedback').innerText = '';
+        document.getElementById('idFinalScore').innerText = 'Final Score: ' + idScore + ' / 3';
+        if (idScore === 3) document.getElementById('idFinalScore').style.color = '#00ff88';
+        else if (idScore === 2) document.getElementById('idFinalScore').style.color = '#ff9800';
+        else document.getElementById('idFinalScore').style.color = '#ff4444';
+        document.getElementById('identifyProgress').style.width = ((idScore / 3) * 100) + '%';
+        return;
+    }
+
+    idCurrentQ = idGameQuestions[idQIndex];
+    document.getElementById('idQuestionNum').innerText = 'Question ' + (idQIndex + 1) + ' of 3';
+    document.getElementById('idClue').innerText = idCurrentQ.clue;
+    document.getElementById('idFeedback').innerText = '';
+    document.getElementById('idFinalScore').innerText = 'Score: ' + idScore + ' / ' + idQIndex;
+    document.getElementById('idButtons').style.display = 'block';
+    document.getElementById('identifyProgress').style.width = (idQIndex / 3 * 100) + '%';
+
+    var shuffledOpts = shuffleArr(idCurrentQ.opts);
+    for (var i = 0; i < 4; i++) {
+        var btn = document.getElementById('idBtn' + i);
+        btn.innerText = shuffledOpts[i];
+        btn.className = 'id-game-btn';
+        btn.disabled = false;
+    }
+}
+
+function makeGuess(idx) {
+    if (idAnswering) return;
+    idAnswering = true;
+
+    var btn = document.getElementById('idBtn' + idx);
+    var guess = btn.innerText;
+    var feedback = document.getElementById('idFeedback');
+
+    for (var i = 0; i < 4; i++) {
+        document.getElementById('idBtn' + i).disabled = true;
+    }
+
+    if (guess === idCurrentQ.answer) {
+        idScore++;
+        btn.classList.add('correct');
+        feedback.innerText = 'Correct!';
+        feedback.style.color = '#00ff88';
+    } else {
+        btn.classList.add('wrong');
+        for (var j = 0; j < 4; j++) {
+            var b = document.getElementById('idBtn' + j);
+            if (b.innerText === idCurrentQ.answer) b.classList.add('correct');
+        }
+        feedback.innerText = 'Wrong! The answer is: ' + idCurrentQ.answer;
+        feedback.style.color = '#ff4444';
+    }
+
+    document.getElementById('idFinalScore').innerText = 'Score: ' + idScore + ' / ' + (idQIndex + 1);
+    idQIndex++;
+
+    setTimeout(function() {
+        idAnswering = false;
+        loadIdentifyQuestion();
+    }, 1800);
+}
+
+function resetIdentifyGame() {
+    idScore = 0; idQIndex = 0; idAnswering = false;
+    idGameQuestions = pickThreeQuestions();
+    document.getElementById('idButtons').style.display = 'block';
+    document.getElementById('idFeedback').innerText = '';
+    document.getElementById('idFinalScore').innerText = '';
+    loadIdentifyQuestion();
+}
+
+// ===================== QUIZ =====================
+var quiz = [
+    ['Which organelle is known as the "control center" of the cell?', 'Nucleus', 'Mitochondria', 'Golgi Apparatus', 'a'],
+    ['Which organelle produces ATP energy through cellular respiration?', 'Mitochondria', 'Lysosome', 'Smooth ER', 'a'],
+    ['Which organelle modifies, sorts, and packages proteins?', 'Golgi Apparatus', 'Rough ER', 'Nucleus', 'a'],
+    ['Which organelle contains digestive enzymes to break down waste?', 'Lysosome', 'Ribosome', 'Centriole', 'a'],
+    ['Which organelle is covered with ribosomes and helps make proteins?', 'Rough ER', 'Smooth ER', 'Golgi Apparatus', 'a'],
+    ['Which organelle synthesizes lipids and detoxifies substances?', 'Smooth ER', 'Rough ER', 'Mitochondria', 'a'],
+    ['What is the jelly-like fluid that fills the cell called?', 'Cytoplasm', 'Cytosol', 'Protoplasm', 'a'],
+    ['Which structure controls what enters and leaves the cell?', 'Cell Membrane', 'Cell Wall', 'Nucleus', 'a'],
+    ['Which organelle plays a key role in cell division?', 'Centrioles', 'Mitochondria', 'Lysosomes', 'a'],
+    ['What is the dark spot inside the nucleus called?', 'Nucleolus', 'Chromosome', 'Ribosome', 'a']
+];
+
+var qi = 0, scoreVal = 0;
+
+function loadQ() {
+    var qEl = document.getElementById('q');
+    var aEl = document.getElementById('a'), bEl = document.getElementById('b'), cEl = document.getElementById('c');
+    var scoreEl = document.getElementById('score'), feedbackEl = document.getElementById('quizFeedback');
+    var progressEl = document.getElementById('quizProgress');
+    feedbackEl.innerText = '';
+    if (qi >= quiz.length) {
+        qEl.innerText = 'Quiz Complete!';
+        scoreEl.innerText = 'Score: ' + scoreVal + ' / ' + quiz.length;
+        aEl.style.display = 'none'; bEl.style.display = 'none'; cEl.style.display = 'none';
+        progressEl.style.width = '100%';
+        if (scoreVal >= quiz.length * 0.8) { feedbackEl.innerText = 'Outstanding! You are a cell expert!'; feedbackEl.style.color = '#00ff88'; }
+        else if (scoreVal >= quiz.length * 0.5) { feedbackEl.innerText = 'Good job! Keep studying!'; feedbackEl.style.color = '#ff9800'; }
+        else { feedbackEl.innerText = 'Keep practicing! You will get better!'; feedbackEl.style.color = '#ff4444'; }
+        return;
+    }
+    aEl.style.display = 'block'; bEl.style.display = 'block'; cEl.style.display = 'block';
+    qEl.innerText = 'Q' + (qi + 1) + '/' + quiz.length + ': ' + quiz[qi][0];
+    aEl.innerText = 'A. ' + quiz[qi][1]; bEl.innerText = 'B. ' + quiz[qi][2]; cEl.innerText = 'C. ' + quiz[qi][3];
+    [aEl, bEl, cEl].forEach(function(btn) { btn.disabled = false; });
+    progressEl.style.width = ((qi / quiz.length) * 100) + '%';
+}
+loadQ();
+
+function ans(c) {
+    var feedbackEl = document.getElementById('quizFeedback');
+    var aEl = document.getElementById('a'), bEl = document.getElementById('b'), cEl = document.getElementById('c');
+    [aEl, bEl, cEl].forEach(function(btn) { btn.disabled = true; });
+    if (c === quiz[qi][4]) { scoreVal++; feedbackEl.innerText = 'Correct!'; feedbackEl.style.color = '#00ff88'; }
+    else { feedbackEl.innerText = 'Wrong! The correct answer is: ' + quiz[qi][1]; feedbackEl.style.color = '#ff4444'; }
+    setTimeout(function() { qi++; loadQ(); }, 1500);
+}
+
+function resetQuiz() {
+    qi = 0; scoreVal = 0;
+    document.getElementById('score').innerText = '';
+    document.getElementById('quizFeedback').innerText = '';
+    loadQ();
+}
+
+// ===================== CREDITS + RATING =====================
+function startCredits() {
+    var credits = document.getElementById('credits');
+    var ratingBox = document.getElementById('ratingBox');
+    credits.classList.remove('animating'); void credits.offsetHeight; credits.classList.add('animating');
+    credits.style.display = 'block'; ratingBox.style.display = 'none';
+    credits.addEventListener('animationend', function() {
+        credits.style.display = 'none'; ratingBox.style.display = 'block';
+        ratingBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, { once: true });
+}
+
+function restartCredits() { startCredits(); }
+
+document.querySelectorAll('.star').forEach(function(star) {
+    star.addEventListener('click', function() { setRating(parseInt(star.dataset.value)); });
+});
+
+function setRating(value) {
+    document.querySelectorAll('.star').forEach(function(s) {
+        s.classList.toggle('active', parseInt(s.dataset.value) <= value);
+    });
+    var emoji = document.getElementById('emoji');
+    var msgs = {
+        5: { t: 'Excellent! Thank you so much!', c: '#00ff88' },
+        4: { t: 'Great! We appreciate it!', c: '#00c6ff' },
+        3: { t: 'Thanks for your feedback!', c: '#ff9800' },
+        2: { t: 'We will work on improving!', c: '#ff6600' },
+        1: { t: 'Sorry! We will do better!', c: '#ff4444' }
+    };
+    emoji.innerText = msgs[value].t; emoji.style.color = msgs[value].c;
+}
+</script>
+
+</body>
+</html>
